@@ -1,0 +1,191 @@
+project-2
+100 best movies on netflix:
+
+*create table netflix_movies(rank int,movie_title string,year int,score int,director string,movie_cast string,critics_consensus string)row format delimited fields terminated by         ','tblproperties('skip.header.line.count'='1');
+*load data local inpath '/home/amitha/data/kaggle_data/100 Best Movies on Netflix.csv' into table netflix_movies;
+*select * from netflix_movies limit 10;
++----------------------+----------------------------------+----------------------+-----------------------+--------------------------+----------------------------+-----------------------------------+
+| netflix_movies.rank  |    netflix_movies.movie_title    | netflix_movies.year  | netflix_movies.score  | netflix_movies.director  | netflix_movies.movie_cast  | netflix_movies.critics_consensus  |
++----------------------+----------------------------------+----------------------+-----------------------+--------------------------+----------------------------+-----------------------------------+
+| 1                    | His House                        | 2020                 | 100                   | Remi Weekes              | "Wunmi Mosaku              |  Sope Dirisu                      |
+| 2                    | How to Train Your Dragon         | 2010                 | 99                    | Christopher Sanders      | "Jay Baruchel              |  Gerard Butler                    |
+| 3                    | The Forty-Year-Old Version       | 2020                 | 99                    | Radha Blank              | "Welker White              |  Reed Birney                      |
+| 4                    | Under the Shadow                 | 2016                 | 99                    | Babak Anvari             | "Narges Rashidi            |  Avin Manshadi                    |
+| 5                    | Monty Python and the Holy Grail  | 1975                 | 98                    | Terry Gilliam            | "Graham Chapman            |  John Cleese                      |
+| 6                    | Ma Rainey's Black Bottom         | 2020                 | 97                    | George C. Wolfe          | "Viola Davis               |  Chadwick Boseman                 |
+| 7                    | The Hurt Locker                  | 2008                 | 97                    | Kathryn Bigelow          | "Jeremy Renner             |  Anthony Mackie                   |
+| 8                    | Hell or High Water               | 2016                 | 97                    | David Mackenzie          | "Jeff Bridges              |  Chris Pine                       |
+| 9                    | Won't You Be My Neighbor?        | 2018                 | 97                    | Morgan Neville           | "Joanne Rogers             |  Bill Isler                       |
+| 10                   | Dolemite Is My Name              | 2019                 | 97                    | Craig Brewer             | "Eddie Murphy              |  Wesley Snipes                    |
++----------------------+----------------------------------+----------------------+-----------------------+--------------------------+----------------------------+-----------------------------------+
+
+#bucketing created based on score
+*select count(distinct(score)) from netflix_movies;
++------+
+| _c0  |
++------+                                                                                   
+| 14   |
++------+
+
+*describe netflix_movies;
++--------------------+------------+----------+
+|      col_name      | data_type  | comment  |
++--------------------+------------+----------+
+| rank               | int        |          |
+| movie_title        | string     |          |
+| year               | int        |          |
+| score              | int        |          |
+| director           | string     |          |
+| movie_cast         | string     |          |
+| critics_consensus  | string     |          |
++--------------------+------------+----------+
+
+partition created bsed on year
+*create table netflix_movies_bkt(rank int,movie_title string,score int,director string,movie_cast string,critics_consensus string)partitioned by(year int)clustered by(score) into 14 buckets row format delimited fields terminated by ','; 
+
+*describe netflix_movies_bkt;
++--------------------------+-----------------------+-----------------------+
+|         col_name         |       data_type       |        comment        |
++--------------------------+-----------------------+-----------------------+
+| rank                     | int                   |                       |
+| movie_title              | string                |                       |
+| score                    | int                   |                       |
+| director                 | string                |                       |
+| movie_cast               | string                |                       |
+| critics_consensus        | string                |                       |
+| year                     | int                   |                       |
+|                          | NULL                  | NULL                  |
+| # Partition Information  | NULL                  | NULL                  |
+| # col_name               | data_type             | comment               |
+|                          | NULL                  | NULL                  |
+| year                     | int                   |                       |
++--------------------------+-----------------------+-----------------------+
+
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+*insert into netflix_movies_bkt partition(year) select rank,movie_title,score,director,movie_cast,critics_consensus,year from netflix_movies;
+
+questions:
+
+q1.find the title of movie who got highest and lowest score.
+
+*select MAX(score)from netflix_movies_bkt;
++------+
+| _c0  |
++------+
+| 100  |
++------+
+
+*select MIN(score) from netflix_movies_bkt;
++------+
+| _c0  |
++------+
+| 87   |
++------+
+
+q2.find the query to retrieve movie_title and maximum score for each movie from the table.
+
+*select movie_title, MAX(score) as max_score from netflix_movies_bkt GROUP BY movie_title limit 5;
++---------------------------------+------------+
+|           movie_title           | max_score  |
++---------------------------------+------------+
+| 1922                            | 92         |
+| All Quiet on the Western Front  | 90         |
+| Always Be My Maybe              | 89         |
+| American Beauty                 | 87         |
+| American Hustle                 | 92         |
++---------------------------------+------------+
+
+q3.print all movie names with rank and year it released starting with 'Th'.
+
+*select rank,movie_title,year from  netflix_movies_bkt where  movie_title like 'Th%' limit 10;
++-------+----------------------------------------------------+-------+
+| rank  |                    movie_title                     | year  |
++-------+----------------------------------------------------+-------+
+| 35    | The Birds                                          | 1963  |
+| 83    | The Bridges of Madison County                      | 1995  |
+| 63    | The Lord of the Rings: The Fellowship of the Ring  | 2001  |
+| 24    | The Lord of the Rings: The Two Towers              | 2002  |
+| 38    | The Lord of the Rings: The Return of the King      | 2003  |
+| 48    | The Bourne Ultimatum                               | 2007  |
+| 7     | The Hurt Locker                                    | 2008  |
+| 76    | The Imitation Game                                 | 2014  |
+| 51    | The Little Prince                                  | 2015  |
+| 61    | The Nice Guys                                      | 2016  |
++-------+----------------------------------------------------+-------+
+
+q4.find top 10 movies released and in which year released.
+
+*Select movie_title, year, score from netflix_movies_bkt ORDER BY score DESC limit 10;
++----------------------------------+-------+--------+
+|           movie_title            | year  | score  |
++----------------------------------+-------+--------+
+| His House                        | 2020  | 100    |
+| Under the Shadow                 | 2016  | 99     |
+| How to Train Your Dragon         | 2010  | 99     |
+| The Forty-Year-Old Version       | 2020  | 99     |
+| Monty Python and the Holy Grail  | 1975  | 98     |
+| Hunt for the Wilderpeople        | 2016  | 97     |
+| The Hurt Locker                  | 2008  | 97     |
+| Mudbound                         | 2017  | 97     |
+| I Lost My Body                   | 2019  | 97     |
+| Ma Rainey's Black Bottom         | 2020  | 97     |
++----------------------------------+-------+--------+
+
+q5.find the movie directed by 'Paul Greengrass' and cast of the movie.
+
+*Select movie_title,movie_cast,director from netflix_movies_bkt where director='Paul Greengrass';
++-----------------------+--------------+------------------+
+|      movie_title      |  movie_cast  |     director     |
++-----------------------+--------------+------------------+
+| The Bourne Ultimatum  | "Matt Damon  | Paul Greengrass  |
+| Captain Phillips      | "Tom Hanks   | Paul Greengrass  |
++-----------------------+--------------+------------------+
+
+q6.list all movies released in 2019 and find score of each movies.
+
+*select movie_title,score,year from  netflix_movies_bkt where year=2019 limit 10;
++----------------------------------+--------+-------+
+|           movie_title            | score  | year  |
++----------------------------------+--------+-------+
+| I Am Mother                      | 89     | 2019  |
+| Paddleton                        | 89     | 2019  |
+| Always Be My Maybe               | 89     | 2019  |
+| The Two Popes                    | 90     | 2019  |
+| High Flying Bird                 | 91     | 2019  |
+| El Camino: A Breaking Bad Movie  | 92     | 2019  |
+| Marriage Story                   | 95     | 2019  |
+| The Irishman                     | 95     | 2019  |
+| Klaus                            | 95     | 2019  |
+| Atlantics                        | 96     | 2019  |
++----------------------------------+--------+-------+
+
+q7.list all movie directors whose name is starting with 'Pa'.
+
+*select movie_title,year,director from  netflix_movies_bkt where director like 'Pa%';
++-----------------------+-------+-----------------------+
+|      movie_title      | year  |       director        |
++-----------------------+-------+-----------------------+
+| The Bourne Ultimatum  | 2007  | Paul Greengrass       |
+| Captain Phillips      | 2013  | Paul Greengrass       |
+| Phantom Thread        | 2017  | Paul Thomas Anderson  |
++-----------------------+-------+-----------------------+
+
+q8.list last 10 movies from the table along with name of directors.
+
+*select movie_title,score from netflix_movies_bkt ORDER BY score DESC limit 10;
++----------------------------------+--------+
+|           movie_title            | score  |
++----------------------------------+--------+
+| His House                        | 100    |
+| Under the Shadow                 | 99     |
+| How to Train Your Dragon         | 99     |
+| The Forty-Year-Old Version       | 99     |
+| Monty Python and the Holy Grail  | 98     |
+| Hunt for the Wilderpeople        | 97     |
+| The Hurt Locker                  | 97     |
+| Mudbound                         | 97     |
+| I Lost My Body                   | 97     |
+| Ma Rainey's Black Bottom         | 97     |
++----------------------------------+--------+
